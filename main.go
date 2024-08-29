@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"my-content-generator/chatgpt"
 	"my-content-generator/config"
+	"my-content-generator/db"
 	"my-content-generator/generate"
 	"my-content-generator/publish"
 )
@@ -15,14 +17,22 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	// Generate content for all keywords at once
-	content, err := chatgpt.GenerateContent(cfg.Keywords, cfg.ChatGPTAPIKey)
+	// Load keywords from JSON file
+	keywords, err := db.LoadKeywords("keywords.json")
 	if err != nil {
-		log.Fatalf("Error generating content: %v", err)
+		log.Fatalf("Error loading keywords: %v", err)
 	}
 
+	// Generate the title and article content using the keywords and ChatGPT
+	title, content, err := chatgpt.GenerateArticle(keywords, cfg.ChatGPTAPIKey)
+	if err != nil {
+		log.Fatalf("Error generating article: %v", err)
+	}
+	fmt.Println("Generated Title:", title)
+	fmt.Println("Generated Content:", content)
+
 	// Save the generated content as a post
-	err = generate.SaveContent("Unified Article on Cloud Engineering", content)
+	err = generate.SaveContent(title, content)
 	if err != nil {
 		log.Fatalf("Error saving content: %v", err)
 	}

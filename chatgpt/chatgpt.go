@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -30,11 +32,21 @@ type APIResponse struct {
 	} `json:"choices"`
 }
 
-// GenerateContent generates a single blog post covering all the provided topics
-func GenerateContent(topics []string, apiKey string) (string, error) {
-	// Create a single prompt that asks to cover all topics
-	prompt := fmt.Sprintf("I have a blog called 'Cloud Engineering Chronicles with Mohammad' where I automate posting articles. Please write a comprehensive article that covers the following topics: %s.",
-		formatTopics(topics))
+// GenerateArticle generates both the title (question) and the article content based on selected keywords using the chat completion API
+func GenerateArticle(keywords []string, apiKey string) (string, string, error) {
+	// Randomly select 2-3 keywords
+	rand.Seed(time.Now().UnixNano())
+	numKeywords := rand.Intn(2) + 2 // Select 2 or 3 keywords
+	selectedKeywords := make([]string, numKeywords)
+
+	for i := 0; i < numKeywords; i++ {
+		index := rand.Intn(len(keywords))
+		selectedKeywords[i] = keywords[index]
+	}
+
+	// Create a prompt for ChatGPT to generate both a question and the content
+	keywordList := strings.Join(selectedKeywords, ", ")
+	prompt := fmt.Sprintf("Generate a blog post title and content that covers the following topics: %s. First, provide a title, then write the article.", keywordList)
 
 	requestBody := APIRequest{
 		Model: "gpt-3.5-turbo", // or "gpt-4" if you have access
@@ -42,18 +54,18 @@ func GenerateContent(topics []string, apiKey string) (string, error) {
 			{Role: "system", Content: "You are a helpful assistant."},
 			{Role: "user", Content: prompt},
 		},
-		MaxTokens: 1000, // Increase max tokens if you expect a longer post
+		MaxTokens: 1500, // Increase max tokens to handle both title and content
 	}
 	requestData, err := json.Marshal(requestBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %w", err)
+		return "", "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
 	var resp *http.Response
 	for i := 0; i < 3; i++ { // Retry up to 3 times
 		req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(requestData))
 		if err != nil {
-			return "", fmt.Errorf("failed to create new request: %w", err)
+			return "", "", fmt.Errorf("failed to create new request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 		req.Header.Set("Content-Type", "application/json")
@@ -71,28 +83,33 @@ func GenerateContent(topics []string, apiKey string) (string, error) {
 		}
 	}
 	if resp == nil || resp.Body == nil {
-		return "", fmt.Errorf("failed to make API request: %w", err)
+		return "", "", fmt.Errorf("failed to make API request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return "", "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var apiResponse APIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
-		return "", fmt.Errorf("failed to decode API response: %w", err)
+		return "", "", fmt.Errorf("failed to decode API response: %w", err)
 	}
 
 	if len(apiResponse.Choices) == 0 {
-		return "", errors.New("no content generated")
+		return "", "", errors.New("no content generated")
 	}
 
-	return apiResponse.Choices[0].Message.Content, nil
-}
+	// Assuming the response has the title and content in the generated text
+	responseContent := apiResponse.Choices[0].Message.Content
+	splitContent := strings.SplitN(responseContent, "\n", 2)
+	if len(splitContent) < 2 {
+		return "", "", errors.New("response format unexpected")
+	}
 
-// formatTopics formats the list of topics into a single string
-func formatTopics(topics []string) string {
-	return fmt.Sprintf("%s", topics)
+	title := strings.TrimSpace(splitContent[0])   // The first line is the title
+	content := strings.TrimSpace(splitContent[1]) // The rest is the content
+
+	return title, content, nil
 }

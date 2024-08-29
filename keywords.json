@@ -1,0 +1,32 @@
+{
+    "keywords": [
+        "Kubernetes",
+        "GKE",
+        "EKS",
+        "AWS",
+        "Lambda",
+        "RabbitMQ",
+        "Terraform",
+        "Terragrunt",
+        "Helmfile",
+        "Helm",
+        "Operator SDK",
+        "Ansible Operator",
+        "Docker",
+        "CI/CD",
+        "Jenkins",
+        "GitOps",
+        "Prometheus",
+        "Grafana",
+        "Istio",
+        "Service Mesh",
+        "Microservices",
+        "KNative",
+        "Cloud Native",
+        "K8s Operators",
+        "OpenShift",
+        "ArgoCD",
+        "Pulumi",
+        "Kustomize"
+    ]
+}

@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// sanitizeFileName replaces or removes invalid characters for file names
-func sanitizeFileName(name string) string {
+// SanitizeFileName replaces or removes invalid characters for file names
+func SanitizeFileName(name string) string {
 	// Replace spaces with hyphens
 	name = strings.ReplaceAll(name, " ", "-")
 
@@ -21,12 +21,32 @@ func sanitizeFileName(name string) string {
 	return strings.ToLower(name)
 }
 
+// GenerateSlug is a public function to create a slug from a title
+func GenerateSlug(title string) string {
+	return SanitizeFileName(title)
+}
+
 // sanitizeTitle removes problematic characters from the title
 func sanitizeTitle(title string) string {
 	// Replace double quotes with single quotes
 	title = strings.ReplaceAll(title, `"`, "'")
 
 	return title
+}
+
+// extractShortDescription extracts the short description from the content
+func extractShortDescription(content string) (string, string) {
+	// Look for the "Short Description:" section and remove it
+	if strings.Contains(content, "Short Description:") {
+		parts := strings.SplitN(content, "Full Article:", 2)
+		if len(parts) == 2 {
+			description := strings.TrimSpace(strings.TrimPrefix(parts[0], "Short Description:"))
+			content = strings.TrimSpace(parts[1])
+			return description, content
+		}
+	}
+
+	return "", content
 }
 
 // GenerateFrontMatter creates the front matter for the Markdown file
@@ -38,7 +58,7 @@ func GenerateFrontMatter(title, description string, tags []string) string {
 	currentDate := time.Now().Format(time.RFC3339)
 
 	// Generate the slug
-	slug := sanitizeFileName(title)
+	slug := SanitizeFileName(title)
 
 	// Convert tags to a comma-separated string
 	tagsStr := fmt.Sprintf(`["%s"]`, strings.Join(tags, `", "`))
@@ -73,12 +93,17 @@ func EnsureDir(dirName string) error {
 // SaveContent saves the generated content to a Markdown file in the 'generated' directory.
 func SaveContent(title, content, description string, tags []string) error {
 	// Sanitize the title to create a valid file name
-	sanitizedTitle := sanitizeFileName(title)
+	sanitizedTitle := SanitizeFileName(title)
 
 	// Ensure the 'generated' directory exists
 	err := EnsureDir("generated")
 	if err != nil {
 		return err
+	}
+
+	// Extract the short description from the content and update the description
+	if description == "" {
+		description, content = extractShortDescription(content)
 	}
 
 	filename := filepath.Join("generated", fmt.Sprintf("%s.md", sanitizedTitle))

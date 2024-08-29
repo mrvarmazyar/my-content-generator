@@ -3,7 +3,6 @@ package chatgpt
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -46,47 +45,39 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, []string
 
 	// Create a prompt for ChatGPT to generate the title, description, tags, and content
 	keywordList := strings.Join(selectedKeywords, ", ")
-	prompt := fmt.Sprintf(`Generate a comprehensive and detailed blog post with the following details:
+	prompt := fmt.Sprintf(`Generate a detailed blog post with the following details:
 1. Title covering these topics: %s.
 2. A short description of the article.
 3. Relevant tags as a comma-separated list.
-4. The full article content. The content should be in-depth, covering multiple aspects of the topics, including challenges, best practices, and real-world examples. It should be designed to take around 10 minutes to read, including sections that discuss the challenges faced when working with these technologies and how to overcome them.`, keywordList)
+4. Categories relevant to these topics as a comma-separated list.
+5. The full article content.`, keywordList)
 
 	requestBody := APIRequest{
 		Model: "gpt-4",
 		Messages: []Message{
-			{Role: "system", Content: "You are a highly skilled technical writer."},
+			{Role: "system", Content: "You are a helpful assistant."},
 			{Role: "user", Content: prompt},
 		},
-		MaxTokens: 3000, // Increase to allow for more detailed content
+		MaxTokens: 1500, // Adjust based on the length of the expected response
 	}
 	requestData, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", "", nil, "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	var resp *http.Response
-	for i := 0; i < 3; i++ { // Retry up to 3 times
-		req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(requestData))
-		if err != nil {
-			return "", "", nil, "", fmt.Errorf("failed to create new request: %w", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-		req.Header.Set("Content-Type", "application/json")
-
-		client := &http.Client{
-			Timeout: 60 * time.Second, // Increase the timeout duration
-		}
-
-		resp, err = client.Do(req)
-		if err == nil {
-			break // Exit loop if request is successful
-		}
-		if i < 2 { // Don't sleep after the last attempt
-			time.Sleep(2 * time.Second) // Wait before retrying
-		}
+	client := &http.Client{
+		Timeout: 30 * time.Second, // Increase the timeout duration
 	}
-	if resp == nil || resp.Body == nil {
+
+	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(requestData))
+	if err != nil {
+		return "", "", nil, "", fmt.Errorf("failed to create new request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
 		return "", "", nil, "", fmt.Errorf("failed to make API request: %w", err)
 	}
 	defer resp.Body.Close()
@@ -102,21 +93,22 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, []string
 	}
 
 	if len(apiResponse.Choices) == 0 {
-		return "", "", nil, "", errors.New("no content generated")
+		return "", "", nil, "", fmt.Errorf("no content generated: %v", apiResponse)
 	}
 
-	// Assuming the response has the title, description, tags, and content in sequence
+	// Assuming the response has the title, description, tags, categories, and content in sequence
 	responseContent := apiResponse.Choices[0].Message.Content
 	lines := strings.Split(responseContent, "\n")
 
 	var title, description, content string
-	var tags []string
+	var tags, categories []string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "Title:") {
 			title = strings.TrimPrefix(line, "Title:")
 			title = strings.TrimSpace(title)
+			title = strings.Trim(title, `"'`) // Remove any leading/trailing quotes
 		} else if strings.HasPrefix(line, "Description:") {
 			description = strings.TrimPrefix(line, "Description:")
 			description = strings.TrimSpace(description)
@@ -125,13 +117,18 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, []string
 			for i, tag := range tags {
 				tags[i] = strings.TrimSpace(tag)
 			}
+		} else if strings.HasPrefix(line, "Categories:") {
+			categories = strings.Split(strings.TrimPrefix(line, "Categories:"), ", ")
+			for i, category := range categories {
+				categories[i] = strings.TrimSpace(category)
+			}
 		} else {
 			content += line + "\n"
 		}
 	}
 
 	if title == "" || content == "" {
-		return "", "", nil, "", errors.New("incomplete response from ChatGPT")
+		return "", "", nil, "", fmt.Errorf("incomplete response from ChatGPT")
 	}
 
 	return title, description, tags, content, nil

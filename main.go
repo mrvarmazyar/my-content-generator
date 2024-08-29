@@ -33,6 +33,9 @@ func main() {
 	fmt.Println("Generated Tags:", tags)
 	fmt.Println("Generated Content:", content)
 
+	// Generate the slug from the title
+	slug := generate.GenerateSlug(title)
+
 	// Save the generated content as a post with front matter
 	err = generate.SaveContent(title, content, description, tags)
 	if err != nil {
@@ -40,7 +43,7 @@ func main() {
 	}
 
 	// Publish the content to GitHub
-	err = publish.PublishToGitHub()
+	err = publish.PublishToGitHub(title, slug)
 	if err != nil {
 		log.Fatalf("Error publishing content: %v", err)
 	}

@@ -52,8 +52,8 @@ func PublishToGitHub() error {
 		return fmt.Errorf("failed to push to main repository: %w", err)
 	}
 
-	// Step 5: Commit and push changes to the Hugo site repository
-	err = gitCommitAndPush("./blog", "Update blog with new posts and rebuild site")
+	// Step 5: Commit and push changes to the Hugo site repository (master branch)
+	err = gitCommitAndPushToMaster("./blog", "Update blog with new posts and rebuild site")
 	if err != nil {
 		return fmt.Errorf("failed to push to Hugo site repository: %w", err)
 	}
@@ -92,6 +92,50 @@ func EnsureDir(dirName string) error {
 
 // gitCommitAndPush commits and pushes changes in the given directory with the provided commit message.
 func gitCommitAndPush(dir, commitMessage string) error {
+	cmd := exec.Command("git", "add", ".")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to add changes: %w", err)
+	}
+
+	cmd = exec.Command("git", "commit", "-m", commitMessage)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	// Get the current branch
+	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = dir
+	currentBranch, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get current branch: %w", err)
+	}
+
+	// Trim the newline from the branch name
+	branchName := string(currentBranch)
+	branchName = branchName[:len(branchName)-1]
+
+	cmd = exec.Command("git", "push", "origin", branchName)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to push changes: %w", err)
+	}
+
+	return nil
+}
+
+// gitCommitAndPushToMaster commits and pushes changes to the master branch in the given directory with the provided commit message.
+func gitCommitAndPushToMaster(dir, commitMessage string) error {
 	cmd := exec.Command("git", "add", ".")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout

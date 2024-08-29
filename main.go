@@ -23,16 +23,18 @@ func main() {
 		log.Fatalf("Error loading keywords: %v", err)
 	}
 
-	// Generate the title and article content using the keywords and ChatGPT
-	title, content, err := chatgpt.GenerateArticle(keywords, cfg.ChatGPTAPIKey)
+	// Generate the title, description, tags, and article content using the keywords and ChatGPT
+	title, description, tags, content, err := chatgpt.GenerateArticle(keywords, cfg.ChatGPTAPIKey)
 	if err != nil {
 		log.Fatalf("Error generating article: %v", err)
 	}
 	fmt.Println("Generated Title:", title)
+	fmt.Println("Generated Description:", description)
+	fmt.Println("Generated Tags:", tags)
 	fmt.Println("Generated Content:", content)
 
-	// Save the generated content as a post
-	err = generate.SaveContent(title, content)
+	// Save the generated content as a post with front matter
+	err = generate.SaveContent(title, content, description, tags)
 	if err != nil {
 		log.Fatalf("Error saving content: %v", err)
 	}

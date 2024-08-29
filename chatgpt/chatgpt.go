@@ -32,8 +32,8 @@ type APIResponse struct {
 	} `json:"choices"`
 }
 
-// GenerateArticle generates both the title (question) and the article content based on selected keywords using the chat completion API
-func GenerateArticle(keywords []string, apiKey string) (string, string, error) {
+// GenerateArticle generates the title, description, tags, and article content based on selected keywords using the chat completion API
+func GenerateArticle(keywords []string, apiKey string) (string, string, []string, string, error) {
 	// Randomly select 2-3 keywords
 	rand.Seed(time.Now().UnixNano())
 	numKeywords := rand.Intn(2) + 2 // Select 2 or 3 keywords
@@ -44,9 +44,9 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, error) {
 		selectedKeywords[i] = keywords[index]
 	}
 
-	// Create a prompt for ChatGPT to generate both a question and the content
+	// Create a prompt for ChatGPT to generate the title, description, tags, and content
 	keywordList := strings.Join(selectedKeywords, ", ")
-	prompt := fmt.Sprintf("Generate a blog post title and content that covers the following topics: %s. First, provide a title, then write the article.", keywordList)
+	prompt := fmt.Sprintf("Generate a blog post with the following details:\n1. Title covering these topics: %s.\n2. A short description of the article.\n3. Relevant tags as a comma-separated list.\n4. The full article content.", keywordList)
 
 	requestBody := APIRequest{
 		Model: "gpt-3.5-turbo", // or "gpt-4" if you have access
@@ -54,18 +54,18 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, error) {
 			{Role: "system", Content: "You are a helpful assistant."},
 			{Role: "user", Content: prompt},
 		},
-		MaxTokens: 1500, // Increase max tokens to handle both title and content
+		MaxTokens: 1500, // Adjust based on the length of the expected response
 	}
 	requestData, err := json.Marshal(requestBody)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal request body: %w", err)
+		return "", "", nil, "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
 	var resp *http.Response
 	for i := 0; i < 3; i++ { // Retry up to 3 times
 		req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(requestData))
 		if err != nil {
-			return "", "", fmt.Errorf("failed to create new request: %w", err)
+			return "", "", nil, "", fmt.Errorf("failed to create new request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 		req.Header.Set("Content-Type", "application/json")
@@ -83,33 +83,37 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, error) {
 		}
 	}
 	if resp == nil || resp.Body == nil {
-		return "", "", fmt.Errorf("failed to make API request: %w", err)
+		return "", "", nil, "", fmt.Errorf("failed to make API request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return "", "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return "", "", nil, "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var apiResponse APIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
-		return "", "", fmt.Errorf("failed to decode API response: %w", err)
+		return "", "", nil, "", fmt.Errorf("failed to decode API response: %w", err)
 	}
 
 	if len(apiResponse.Choices) == 0 {
-		return "", "", errors.New("no content generated")
+		return "", "", nil, "", errors.New("no content generated")
 	}
 
-	// Assuming the response has the title and content in the generated text
+	// Assuming the response has the title, description, tags, and content in sequence
 	responseContent := apiResponse.Choices[0].Message.Content
-	splitContent := strings.SplitN(responseContent, "\n", 2)
-	if len(splitContent) < 2 {
-		return "", "", errors.New("response format unexpected")
+	lines := strings.Split(responseContent, "\n")
+
+	if len(lines) < 4 {
+		return "", "", nil, "", errors.New("response format unexpected")
 	}
 
-	title := strings.TrimSpace(splitContent[0])   // The first line is the title
-	content := strings.TrimSpace(splitContent[1]) // The rest is the content
+	// Parse the title, description, and tags
+	title := strings.TrimSpace(lines[0])                     // The first line is the title
+	description := strings.TrimSpace(lines[1])               // The second line is the description
+	tags := strings.Split(strings.TrimSpace(lines[2]), ", ") // The third line is the tags
+	content := strings.Join(lines[3:], "\n")                 // The rest is the content
 
-	return title, content, nil
+	return title, description, tags, content, nil
 }

@@ -11,14 +11,14 @@ import (
 // PublishToGitHub publishes the generated content to the Hugo site repository and pushes to both repositories.
 func PublishToGitHub() error {
 	// Step 1: Ensure the submodule is correctly initialized and updated
-	err := updateSubmoduleToMaster("./blog")
+	err := updateSubmoduleToMaster("./website")
 	if err != nil {
 		return fmt.Errorf("failed to update submodule to master: %w", err)
 	}
 
 	// Step 2: Move the generated content to the Hugo content directory
 	generatedDir := "generated"
-	targetDir := "./blog/content/posts/"
+	targetDir := "./website/content/posts/"
 
 	// Ensure the generated directory exists before attempting to move files
 	if _, err := os.Stat(generatedDir); os.IsNotExist(err) {
@@ -45,7 +45,7 @@ func PublishToGitHub() error {
 
 	// Step 4: Build the Hugo site in the correct directory
 	cmd := exec.Command("hugo")
-	cmd.Dir = "./blog" // Ensure this is pointing to the correct directory
+	cmd.Dir = "./website" // Ensure this is pointing to the correct directory
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
@@ -60,7 +60,7 @@ func PublishToGitHub() error {
 	}
 
 	// Step 6: Perform a fresh pull and force push to the Hugo site repository's public directory (master branch)
-	err = gitFreshPullAndPushToMaster("./blog/public", "Deploy new site version")
+	err = gitFreshPullAndPushToMaster("./website/public", "Deploy new site version")
 	if err != nil {
 		return fmt.Errorf("failed to push to Hugo site deployment branch: %w", err)
 	}
@@ -200,7 +200,7 @@ func gitFreshPullAndPushToMaster(dir, commitMessage string) error {
 
 	// Step 3: Build the Hugo site (ensure this is in the correct directory)
 	cmd = exec.Command("hugo")
-	cmd.Dir = "./blog" // This must point to the directory where Hugo's config files are located
+	cmd.Dir = "./website" // This must point to the directory where Hugo's config files are located
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()

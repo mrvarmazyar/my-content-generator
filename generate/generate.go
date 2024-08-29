@@ -21,8 +21,19 @@ func sanitizeFileName(name string) string {
 	return strings.ToLower(name)
 }
 
+// sanitizeTitle removes problematic characters from the title
+func sanitizeTitle(title string) string {
+	// Replace double quotes with single quotes
+	title = strings.ReplaceAll(title, `"`, "'")
+
+	return title
+}
+
 // GenerateFrontMatter creates the front matter for the Markdown file
 func GenerateFrontMatter(title, description string, tags []string) string {
+	// Sanitize the title to remove any problematic characters
+	title = sanitizeTitle(title)
+
 	// Format the current date
 	currentDate := time.Now().Format(time.RFC3339)
 

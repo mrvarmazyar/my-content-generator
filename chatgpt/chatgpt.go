@@ -53,7 +53,7 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, []string
 4. The full article content. The content should be in-depth, covering multiple aspects of the topics, including challenges, best practices, and real-world examples. It should be designed to take around 10 minutes to read, including sections that discuss the challenges faced when working with these technologies and how to overcome them.`, keywordList)
 
 	requestBody := APIRequest{
-		Model: "gpt-3.5-turbo", // or "gpt-4" if you have access
+		Model: "gpt-4",
 		Messages: []Message{
 			{Role: "system", Content: "You are a highly skilled technical writer."},
 			{Role: "user", Content: prompt},

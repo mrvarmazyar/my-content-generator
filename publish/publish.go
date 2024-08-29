@@ -10,7 +10,13 @@ import (
 
 // PublishToGitHub publishes the generated content to the Hugo site repository and pushes to both repositories.
 func PublishToGitHub() error {
-	// Step 1: Move the generated content to the Hugo content directory
+	// Step 1: Ensure the submodule is correctly initialized and updated
+	err := updateSubmoduleToMaster("./blog")
+	if err != nil {
+		return fmt.Errorf("failed to update submodule to master: %w", err)
+	}
+
+	// Step 2: Move the generated content to the Hugo content directory
 	generatedDir := "generated"
 	targetDir := "./blog/content/posts/"
 
@@ -20,7 +26,7 @@ func PublishToGitHub() error {
 	}
 
 	// Ensure the target directory exists
-	err := EnsureDir(targetDir)
+	err = EnsureDir(targetDir)
 	if err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
@@ -31,15 +37,15 @@ func PublishToGitHub() error {
 		return fmt.Errorf("failed to move files: %w", err)
 	}
 
-	// Step 2: Check if Hugo is installed
+	// Step 3: Check if Hugo is installed
 	_, err = exec.LookPath("hugo")
 	if err != nil {
 		return fmt.Errorf("Hugo is not installed. Please install Hugo before running this script.")
 	}
 
-	// Step 3: Build the Hugo site
+	// Step 4: Build the Hugo site in the correct directory
 	cmd := exec.Command("hugo")
-	cmd.Dir = "./blog" // Set working directory to the Hugo site directory
+	cmd.Dir = "./blog" // Ensure this is pointing to the correct directory
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
@@ -47,16 +53,50 @@ func PublishToGitHub() error {
 		return fmt.Errorf("failed to build Hugo site: %w", err)
 	}
 
-	// Step 4: Commit and push changes to the main repository
+	// Step 5: Commit and push changes to the main repository
 	err = gitCommitAndPush(".", "Add new blog post")
 	if err != nil {
 		return fmt.Errorf("failed to push to main repository: %w", err)
 	}
 
-	// Step 5: Commit and push changes to the Hugo site repository's public directory (master branch)
-	err = gitPullAndPushToMaster("./blog/public", "Deploy new site version")
+	// Step 6: Perform a fresh pull and force push to the Hugo site repository's public directory (master branch)
+	err = gitFreshPullAndPushToMaster("./blog/public", "Deploy new site version")
 	if err != nil {
 		return fmt.Errorf("failed to push to Hugo site deployment branch: %w", err)
+	}
+
+	return nil
+}
+
+// updateSubmoduleToMaster initializes, updates, checks out the master branch, and forcefully resets the submodule to match the remote master branch.
+func updateSubmoduleToMaster(dir string) error {
+	// Initialize and update the submodule
+	cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to update submodule: %w", err)
+	}
+
+	// Change directory to the submodule
+	cmd = exec.Command("git", "checkout", "master")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to checkout master branch in submodule: %w", err)
+	}
+
+	// Forcefully reset the master branch to match the remote
+	cmd = exec.Command("git", "reset", "--hard", "origin/master")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to forcefully reset submodule to origin/master: %w", err)
 	}
 
 	return nil
@@ -108,7 +148,12 @@ func gitCommitAndPush(dir, commitMessage string) error {
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to commit changes: %w", err)
+		// If there's nothing to commit, just move on
+		if strings.Contains(err.Error(), "nothing to commit") {
+			fmt.Println("Nothing to commit.")
+		} else {
+			return fmt.Errorf("failed to commit changes: %w", err)
+		}
 	}
 
 	// Get the current branch
@@ -135,45 +180,35 @@ func gitCommitAndPush(dir, commitMessage string) error {
 	return nil
 }
 
-// gitPullAndPushToMaster pulls the latest changes from the remote master branch,
-// commits local changes, and pushes to the master branch in the given directory with the provided commit message.
-func gitPullAndPushToMaster(dir, commitMessage string) error {
-	// Step 1: Stash any unstaged changes
-	cmd := exec.Command("git", "stash", "--include-untracked")
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
+// gitFreshPullAndPushToMaster performs a fresh pull of the submodule, builds the site, and force-pushes the updates.
+func gitFreshPullAndPushToMaster(dir, commitMessage string) error {
+	// Step 1: Remove the existing submodule directory
+	err := os.RemoveAll(dir)
 	if err != nil {
-		return fmt.Errorf("failed to stash changes: %w", err)
+		return fmt.Errorf("failed to remove submodule directory: %w", err)
 	}
 
-	// Step 2: Pull the latest changes from the remote master branch
-	cmd = exec.Command("git", "pull", "--rebase", "origin", "master")
-	cmd.Dir = dir
+	// Step 2: Clone the submodule afresh
+	cmd := exec.Command("git", "submodule", "update", "--init", "--recursive")
+	cmd.Dir = filepath.Dir(dir) // Go to the parent directory of the submodule
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to pull latest changes: %w", err)
+		return fmt.Errorf("failed to clone submodule: %w", err)
 	}
 
-	// Step 3: Apply stashed changes
-	cmd = exec.Command("git", "stash", "pop")
-	cmd.Dir = dir
+	// Step 3: Build the Hugo site (ensure this is in the correct directory)
+	cmd = exec.Command("hugo")
+	cmd.Dir = "./blog" // This must point to the directory where Hugo's config files are located
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		// If there's nothing to pop, continue
-		if strings.Contains(err.Error(), "No stash entries found") {
-			fmt.Println("No stash entries found.")
-		} else {
-			return fmt.Errorf("failed to apply stashed changes: %w", err)
-		}
+		return fmt.Errorf("failed to build Hugo site: %w", err)
 	}
 
-	// Step 4: Add local changes
+	// Step 4: Add and commit the changes
 	cmd = exec.Command("git", "add", ".")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -183,7 +218,6 @@ func gitPullAndPushToMaster(dir, commitMessage string) error {
 		return fmt.Errorf("failed to add changes: %w", err)
 	}
 
-	// Step 5: Commit the changes
 	cmd = exec.Command("git", "commit", "-m", commitMessage)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -198,14 +232,14 @@ func gitPullAndPushToMaster(dir, commitMessage string) error {
 		}
 	}
 
-	// Step 6: Push the changes to the remote master branch
-	cmd = exec.Command("git", "push", "origin", "master")
+	// Step 5: Force push the changes to the remote master branch
+	cmd = exec.Command("git", "push", "origin", "master", "--force")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to push changes: %w", err)
+		return fmt.Errorf("failed to force push changes: %w", err)
 	}
 
 	return nil

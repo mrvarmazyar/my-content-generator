@@ -46,20 +46,19 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, []string
 
 	// Create a prompt for ChatGPT to generate the title, description, tags, and content
 	keywordList := strings.Join(selectedKeywords, ", ")
-	prompt := fmt.Sprintf(`Generate a long and informative blog post with the following details:
+	prompt := fmt.Sprintf(`Generate a comprehensive and detailed blog post with the following details:
 1. Title covering these topics: %s.
 2. A short description of the article.
 3. Relevant tags as a comma-separated list.
-4. The full article content.
-I expect this blog post to be around 10 minutes long.`, keywordList)
+4. The full article content. The content should be in-depth, covering multiple aspects of the topics, including challenges, best practices, and real-world examples. It should be designed to take around 10 minutes to read, including sections that discuss the challenges faced when working with these technologies and how to overcome them.`, keywordList)
 
 	requestBody := APIRequest{
 		Model: "gpt-3.5-turbo", // or "gpt-4" if you have access
 		Messages: []Message{
-			{Role: "system", Content: "You are a helpful assistant."},
+			{Role: "system", Content: "You are a highly skilled technical writer."},
 			{Role: "user", Content: prompt},
 		},
-		MaxTokens: 1500, // Adjust based on the length of the expected response
+		MaxTokens: 3000, // Increase to allow for more detailed content
 	}
 	requestData, err := json.Marshal(requestBody)
 	if err != nil {
@@ -76,7 +75,7 @@ I expect this blog post to be around 10 minutes long.`, keywordList)
 		req.Header.Set("Content-Type", "application/json")
 
 		client := &http.Client{
-			Timeout: 30 * time.Second, // Increase the timeout duration
+			Timeout: 60 * time.Second, // Increase the timeout duration
 		}
 
 		resp, err = client.Do(req)

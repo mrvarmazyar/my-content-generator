@@ -3,6 +3,7 @@ package generate
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -49,12 +50,27 @@ series = []
 	return frontMatter
 }
 
-// SaveContent saves the generated content to a Markdown file with front matter.
-func SaveContent(title, content string, description string, tags []string) error {
+// EnsureDir ensures that a directory exists, creating it if necessary.
+func EnsureDir(dirName string) error {
+	err := os.MkdirAll(dirName, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dirName, err)
+	}
+	return nil
+}
+
+// SaveContent saves the generated content to a Markdown file in the 'generated' directory.
+func SaveContent(title, content, description string, tags []string) error {
 	// Sanitize the title to create a valid file name
 	sanitizedTitle := sanitizeFileName(title)
 
-	filename := fmt.Sprintf("%s.md", sanitizedTitle)
+	// Ensure the 'generated' directory exists
+	err := EnsureDir("generated")
+	if err != nil {
+		return err
+	}
+
+	filename := filepath.Join("generated", fmt.Sprintf("%s.md", sanitizedTitle))
 	file, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)

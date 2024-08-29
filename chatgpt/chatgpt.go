@@ -46,7 +46,7 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, []string
 
 	// Create a prompt for ChatGPT to generate the title, description, tags, and content
 	keywordList := strings.Join(selectedKeywords, ", ")
-	prompt := fmt.Sprintf(`Generate a blog post with the following details:
+	prompt := fmt.Sprintf(`Generate a long (around 5 to 10 minutes reading time) and informative blog post with the following details:
 1. Title covering these topics: %s.
 2. A short description of the article.
 3. Relevant tags as a comma-separated list.

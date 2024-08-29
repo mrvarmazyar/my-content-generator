@@ -138,17 +138,42 @@ func gitCommitAndPush(dir, commitMessage string) error {
 // gitPullAndPushToMaster pulls the latest changes from the remote master branch,
 // commits local changes, and pushes to the master branch in the given directory with the provided commit message.
 func gitPullAndPushToMaster(dir, commitMessage string) error {
-	// Pull the latest changes from the remote master branch
-	cmd := exec.Command("git", "pull", "--rebase", "origin", "master")
+	// Step 1: Stash any unstaged changes
+	cmd := exec.Command("git", "stash", "--include-untracked")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
+		return fmt.Errorf("failed to stash changes: %w", err)
+	}
+
+	// Step 2: Pull the latest changes from the remote master branch
+	cmd = exec.Command("git", "pull", "--rebase", "origin", "master")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
 		return fmt.Errorf("failed to pull latest changes: %w", err)
 	}
 
-	// Add local changes
+	// Step 3: Apply stashed changes
+	cmd = exec.Command("git", "stash", "pop")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		// If there's nothing to pop, continue
+		if strings.Contains(err.Error(), "No stash entries found") {
+			fmt.Println("No stash entries found.")
+		} else {
+			return fmt.Errorf("failed to apply stashed changes: %w", err)
+		}
+	}
+
+	// Step 4: Add local changes
 	cmd = exec.Command("git", "add", ".")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -158,7 +183,7 @@ func gitPullAndPushToMaster(dir, commitMessage string) error {
 		return fmt.Errorf("failed to add changes: %w", err)
 	}
 
-	// Commit the changes
+	// Step 5: Commit the changes
 	cmd = exec.Command("git", "commit", "-m", commitMessage)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -173,7 +198,7 @@ func gitPullAndPushToMaster(dir, commitMessage string) error {
 		}
 	}
 
-	// Push the changes to the remote master branch
+	// Step 6: Push the changes to the remote master branch
 	cmd = exec.Command("git", "push", "origin", "master")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout

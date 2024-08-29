@@ -52,8 +52,8 @@ func PublishToGitHub() error {
 		return fmt.Errorf("failed to push to main repository: %w", err)
 	}
 
-	// Step 5: Commit and push changes to the Hugo site repository's public directory (gh-pages branch)
-	err = gitCommitAndPushToBranch("./blog/public", "gh-pages", "Deploy new site version")
+	// Step 5: Commit and push changes to the Hugo site repository's public directory (master branch)
+	err = gitCommitAndPushToMaster("./blog/public", "Deploy new site version")
 	if err != nil {
 		return fmt.Errorf("failed to push to Hugo site deployment branch: %w", err)
 	}
@@ -134,8 +134,8 @@ func gitCommitAndPush(dir, commitMessage string) error {
 	return nil
 }
 
-// gitCommitAndPushToBranch commits and pushes changes to the specified branch in the given directory with the provided commit message.
-func gitCommitAndPushToBranch(dir, branchName, commitMessage string) error {
+// gitCommitAndPushToMaster commits and pushes changes to the master branch in the given directory with the provided commit message.
+func gitCommitAndPushToMaster(dir, commitMessage string) error {
 	cmd := exec.Command("git", "add", ".")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -154,7 +154,8 @@ func gitCommitAndPushToBranch(dir, branchName, commitMessage string) error {
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
 
-	cmd = exec.Command("git", "push", "origin", branchName)
+	// Push to the master branch
+	cmd = exec.Command("git", "push", "origin", "master")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

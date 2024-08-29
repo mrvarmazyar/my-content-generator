@@ -18,7 +18,7 @@ func main() {
 	}
 
 	// Load keywords from JSON file
-	keywords, err := db.LoadKeywords("keywords.json")
+	keywords, err := db.LoadKeywords("db/keywords.json")
 	if err != nil {
 		log.Fatalf("Error loading keywords: %v", err)
 	}

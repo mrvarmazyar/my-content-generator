@@ -46,7 +46,11 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, []string
 
 	// Create a prompt for ChatGPT to generate the title, description, tags, and content
 	keywordList := strings.Join(selectedKeywords, ", ")
-	prompt := fmt.Sprintf("Generate a blog post with the following details:\n1. Title covering these topics: %s.\n2. A short description of the article.\n3. Relevant tags as a comma-separated list.\n4. The full article content.", keywordList)
+	prompt := fmt.Sprintf(`Generate a blog post with the following details:
+1. Title covering these topics: %s.
+2. A short description of the article.
+3. Relevant tags as a comma-separated list.
+4. The full article content.`, keywordList)
 
 	requestBody := APIRequest{
 		Model: "gpt-3.5-turbo", // or "gpt-4" if you have access
@@ -105,15 +109,30 @@ func GenerateArticle(keywords []string, apiKey string) (string, string, []string
 	responseContent := apiResponse.Choices[0].Message.Content
 	lines := strings.Split(responseContent, "\n")
 
-	if len(lines) < 4 {
-		return "", "", nil, "", errors.New("response format unexpected")
+	var title, description, content string
+	var tags []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Title:") {
+			title = strings.TrimPrefix(line, "Title:")
+			title = strings.TrimSpace(title)
+		} else if strings.HasPrefix(line, "Description:") {
+			description = strings.TrimPrefix(line, "Description:")
+			description = strings.TrimSpace(description)
+		} else if strings.HasPrefix(line, "Tags:") {
+			tags = strings.Split(strings.TrimPrefix(line, "Tags:"), ", ")
+			for i, tag := range tags {
+				tags[i] = strings.TrimSpace(tag)
+			}
+		} else {
+			content += line + "\n"
+		}
 	}
 
-	// Parse the title, description, and tags
-	title := strings.TrimSpace(lines[0])                     // The first line is the title
-	description := strings.TrimSpace(lines[1])               // The second line is the description
-	tags := strings.Split(strings.TrimSpace(lines[2]), ", ") // The third line is the tags
-	content := strings.Join(lines[3:], "\n")                 // The rest is the content
+	if title == "" || content == "" {
+		return "", "", nil, "", errors.New("incomplete response from ChatGPT")
+	}
 
 	return title, description, tags, content, nil
 }

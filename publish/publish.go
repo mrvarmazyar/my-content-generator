@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // PublishToGitHub publishes the generated content to the Hugo site repository and pushes to both repositories.
@@ -53,7 +54,7 @@ func PublishToGitHub() error {
 	}
 
 	// Step 5: Commit and push changes to the Hugo site repository's public directory (master branch)
-	err = gitCommitAndPushToMaster("./blog/public", "Deploy new site version")
+	err = gitPullAndPushToMaster("./blog/public", "Deploy new site version")
 	if err != nil {
 		return fmt.Errorf("failed to push to Hugo site deployment branch: %w", err)
 	}
@@ -134,27 +135,45 @@ func gitCommitAndPush(dir, commitMessage string) error {
 	return nil
 }
 
-// gitCommitAndPushToMaster commits and pushes changes to the master branch in the given directory with the provided commit message.
-func gitCommitAndPushToMaster(dir, commitMessage string) error {
-	cmd := exec.Command("git", "add", ".")
+// gitPullAndPushToMaster pulls the latest changes from the remote master branch,
+// commits local changes, and pushes to the master branch in the given directory with the provided commit message.
+func gitPullAndPushToMaster(dir, commitMessage string) error {
+	// Pull the latest changes from the remote master branch
+	cmd := exec.Command("git", "pull", "--rebase", "origin", "master")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	if err != nil {
+		return fmt.Errorf("failed to pull latest changes: %w", err)
+	}
+
+	// Add local changes
+	cmd = exec.Command("git", "add", ".")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
 		return fmt.Errorf("failed to add changes: %w", err)
 	}
 
+	// Commit the changes
 	cmd = exec.Command("git", "commit", "-m", commitMessage)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to commit changes: %w", err)
+		// If there's nothing to commit, just move on
+		if strings.Contains(err.Error(), "nothing to commit") {
+			fmt.Println("Nothing to commit.")
+		} else {
+			return fmt.Errorf("failed to commit changes: %w", err)
+		}
 	}
 
-	// Push to the master branch
+	// Push the changes to the remote master branch
 	cmd = exec.Command("git", "push", "origin", "master")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout

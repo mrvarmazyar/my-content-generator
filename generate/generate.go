@@ -35,7 +35,7 @@ func GenerateFrontMatter(title, description string, tags []string) string {
 	frontMatter := fmt.Sprintf(`+++
 draft = false
 date = %s
-title = %s
+title = "%s"
 description = "%s"
 slug = "%s"
 authors = ["Mohammad Varmazyar"]
